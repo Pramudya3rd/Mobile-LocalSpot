@@ -1,9 +1,6 @@
-// src/screens/WelcomeScreen.js
 import React from "react";
-// Tambahkan 'TouchableOpacity' ke dalam daftar impor dari 'react-native'
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import LargeButton from "../components/LargeButton"; // Pastikan path ini benar
-// Pastikan juga Anda memiliki komponen LargeButton dan LinkButton di folder yang benar.
 
 const WelcomeScreen = () => {
   const handleLogin = () => {
