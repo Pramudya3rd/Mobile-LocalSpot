@@ -1,9 +1,9 @@
 // src/screens/SplashScreen.js
 import React from "react";
-// Tambahkan 'Image' ke dalam daftar impor dari 'react-native'
 import { View, Image, StyleSheet } from "react-native";
 
 export default function SplashScreen() {
+  // Pastikan tidak ada spasi atau newline ekstra di sini
   return (
     <View style={styles.container}>
       <Image

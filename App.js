@@ -1,34 +1,58 @@
-import React, { useState, useEffect } from "react"; // Impor useState dan useEffect
+// App.js
+import React, { useState, useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View } from "react-native"; // Text dan View mungkin tidak perlu di App.js ini
-// tergantung apakah ada konten di App.js langsung
-// atau hanya merender screen lain.
+import { View } from "react-native";
 
-// Impor komponen SplashScreen dan WelcomeScreen sebagai default import (tanpa {})
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+
+// --- IMPORT INI ---
+import { GestureHandlerRootView } from "react-native-gesture-handler"; // Import GestureHandlerRootView
+
 import SplashScreen from "./src/screens/SplashScreen";
 import WelcomeScreen from "./src/screens/WelcomeScreen";
+import LoginScreen from "./src/screens/LoginScreen";
+import HomeScreen from "./src/screens/HomeScreen";
+
+const Stack = createNativeStackNavigator();
 
 export default function App() {
-  // Atur nilai awal isShowSplash menjadi TRUE agar SplashScreen muncul duluan
-  const [isShowSplash, setIsShowSplash] = useState(true);
+  const [appIsReady, setAppIsReady] = useState(false);
 
   useEffect(() => {
-    // Jalankan timer hanya sekali saat komponen di-mount
-    setTimeout(() => {
-      setIsShowSplash(false); // Sembunyikan splash screen setelah 3 detik
-    }, 3000); // Durasi 3 detik
-  }, []); // Tambahkan dependency array kosong agar useEffect hanya berjalan sekali
+    async function prepareApp() {
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setAppIsReady(true);
+      }
+    }
+    prepareApp();
+  }, []);
 
-  // Kondisional rendering: Tampilkan SplashScreen jika isShowSplash TRUE, selain itu tampilkan WelcomeScreen
-  return isShowSplash ? <SplashScreen /> : <WelcomeScreen />;
+  if (!appIsReady) {
+    return <SplashScreen />;
+  }
+
+  return (
+    // --- BUNGKUS SELURUH APLIKASI DENGAN GestureHandlerRootView ---
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <NavigationContainer>
+        <StatusBar style="dark" />
+        <Stack.Navigator
+          initialRouteName="Welcome"
+          screenOptions={{ headerShown: false }}
+        >
+          <Stack.Screen name="Welcome" component={WelcomeScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Home" component={HomeScreen} />
+          {/* Tambahkan layar 'Register' di sini jika Anda membuatnya */}
+          {/* <Stack.Screen name="Register" component={RegisterScreen} /> */}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </GestureHandlerRootView>
+    // --- AKHIR PEMBUNGKUSAN ---
+  );
 }
-
-// Catatan: StyleSheet ini tidak digunakan di App.js yang sekarang, bisa dihapus jika tidak diperlukan
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: "#fff",
-//     alignItems: "center",
-//     justifyContent: "center",
-//   },
-// });
