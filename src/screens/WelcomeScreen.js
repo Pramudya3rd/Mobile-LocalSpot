@@ -33,11 +33,11 @@ const WelcomeScreen = () => {
     navigation.navigate("Login");
   };
   const handleRegister = () => {
-    Alert.alert("Fitur Register", "Fitur registrasi akan segera hadir!");
+    navigation.navigate("Register");
   };
   const handleContinueAsGuest = () => {
     console.log("Melanjutkan sebagai tamu ditekan! Navigasi ke Home.");
-    navigation.replace("Home");
+    navigation.replace("MainAppTabs");
   };
 
   return (

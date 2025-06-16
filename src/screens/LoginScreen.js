@@ -85,14 +85,14 @@ export default function LoginScreen() {
           setEmail(""); // Bersihkan input
           setPassword(""); // Bersihkan input
 
-          navigation.replace("Home"); // Navigasi ke layar utama (HomeScreen)
+          navigation.replace("MainAppTabs"); // Navigasi ke layar utama (HomeScreen)
         } else {
           setError("Login berhasil, tapi tidak ada token diterima.");
           Alert.alert(
             "Login Berhasil",
             "Selamat datang kembali! (Token tidak diterima)"
           );
-          navigation.replace("Home"); // Tetap navigasi
+          navigation.replace("MainAppTabs"); // Tetap navigasi
         }
       } else {
         // Jika status HTTP 4xx atau 5xx (login gagal)
@@ -112,19 +112,11 @@ export default function LoginScreen() {
   };
 
   const handleForgotPassword = () => {
-    Alert.alert(
-      "Lupa Kata Sandi",
-      "Anda akan diarahkan ke halaman reset password."
-    );
-    // Logika navigasi ke layar lupa kata sandi
+    navigation.navigate("ForgotPassword");
   };
 
   const handleRegisterNow = () => {
-    Alert.alert(
-      "Daftar Sekarang",
-      "Anda akan diarahkan ke halaman pendaftaran."
-    );
-    // Logika navigasi ke layar pendaftaran
+    navigation.navigate("Register");
   };
 
   const handleBack = () => {
