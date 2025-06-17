@@ -21,7 +21,6 @@ import ResetPasswordScreen from "./src/screens/ResetPasswordScreen";
 // import ReviewCard from "./src/components/ReviewCard";
 // import FeatureButton from "./src/components/FeatureButton";
 import PlaceDetailScreen from "./src/screens/PlaceDetailScreen";
-
 // Import AppNavigator Anda (ini adalah Bottom Tab Navigator)
 import AppNavigator from "./src/navigation/AppNavigator";
 
@@ -65,6 +64,7 @@ export default function App() {
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="OTPScreen" component={OTPScreen} />
         <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        <Stack.Screen name="AddScreen" component={PlaceDetailScreen} />
 
         {/* Screen untuk Main App Tabs (AppNavigator) */}
         {/* Ketika pengguna masuk ke "MainAppTabs", maka Bottom Tab Navigator akan muncul */}

@@ -60,8 +60,7 @@ export default function RegisterScreen() {
     }
 
     try {
-      const BACKEND_REGISTER_URL =
-        "https://localspot.hafidzirham.com/api/register";
+      const BACKEND_REGISTER_URL = "http://10.0.2.2:8000/api/register";
 
       const response = await fetch(BACKEND_REGISTER_URL, {
         method: "POST",
@@ -97,7 +96,7 @@ export default function RegisterScreen() {
           setEmail("");
           setPassword("");
           setPasswordConfirmation("");
-          navigation.replace("Home");
+          navigation.replace("MainAppTabs");
         } else {
           setError("Pendaftaran berhasil, tapi tidak ada token diterima.");
           Alert.alert(
