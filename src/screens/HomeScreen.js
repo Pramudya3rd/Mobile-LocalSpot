@@ -1,5 +1,5 @@
-// screens/HomeScreen.js
-import React, { useState, useEffect, useCallback } from "react"; // Tambahkan useCallback
+// HomeScreen.js
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -9,162 +9,324 @@ import {
   ActivityIndicator,
   Text,
   TouchableOpacity,
-  Alert, // Tambahkan Alert untuk notifikasi user
+  Platform,
+  StatusBar,
 } from "react-native";
+import * as Location from "expo-location";
+import { useFocusEffect } from "@react-navigation/native";
 
+// Import helper dan komponen Anda
+import apiFetch from "../services/api";
 import AppHeader from "../components/AppHeader";
-import SearchBar from "../components/SearchBar";
+import SearchBar from "../components/SearchBar"; // Pastikan SearchBar telah diperbarui
 import PromoBanner from "../components/PromoBanner";
 import SectionHeader from "../components/SectionHeader";
-import CategoryCard from "../components/CategoryCard";
+import CategoryCard from "../components/CategoryCard"; // Pastikan CategoryCard telah diperbarui
 import FavoriteCard from "../components/FavoriteCard";
+import RecommendationCard from "../components/RecommendationCard";
 
-// Pastikan IP ini adalah IP lokal komputer Anda tempat Laravel backend berjalan.
-// Untuk emulator Android, 10.0.2.2 mengarah ke localhost mesin host Anda.
-// Jika menggunakan perangkat fisik, ganti dengan IP lokal Anda, misal 'http://192.168.1.xxx:8000/api'
-const API_BASE_URL = "http://10.0.2.2:8000/api";
-
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }) => {
   const [categoriesData, setCategoriesData] = useState([]);
   const [favoritesData, setFavoritesData] = useState([]);
+  const [recommendationsData, setRecommendationsData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshingLocation, setIsRefreshingLocation] = useState(false);
   const [error, setError] = useState(null);
 
-  // Menggunakan useCallback untuk mencegah re-render fungsi yang tidak perlu
-  const fetchCategories = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/categories`);
-      const json = await response.json();
+  const [userAddress, setUserAddress] = useState(
+    "Ketuk ikon untuk mencari lokasi"
+  );
 
-      if (response.ok) {
-        // Data kategori dari backend Anda (CategoryController@index)
-        // seharusnya sudah memiliki `icon_url` berkat accessor di Category model.
-        const transformedCategories = json.map((cat) => ({
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState(null);
+  const [currentUserCoords, setCurrentUserCoords] = useState(null);
+
+  const searchDebounceTimer = useRef(null);
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    // Bersihkan timer sebelumnya jika ada
+    if (searchDebounceTimer.current) {
+      clearTimeout(searchDebounceTimer.current);
+    }
+
+    // Set timer baru untuk memicu pencarian setelah 500ms
+    searchDebounceTimer.current = setTimeout(() => {
+      console.log(
+        "Memicu fetchHomeSections karena search/filter/lokasi berubah..."
+      );
+      if (
+        recommendationsData.length === 0 ||
+        searchQuery !== "" ||
+        selectedCategoryFilter !== null
+      ) {
+        setIsLoading(true);
+      }
+      setError(null);
+      fetchHomeSections(
+        currentUserCoords,
+        searchQuery,
+        selectedCategoryFilter
+      ).finally(() => setIsLoading(false));
+    }, 500);
+
+    // Cleanup function: Hapus timer jika komponen di-unmount atau dependensi berubah
+    return () => {
+      if (searchDebounceTimer.current) {
+        clearTimeout(searchDebounceTimer.current);
+      }
+    };
+  }, [searchQuery, selectedCategoryFilter, currentUserCoords]);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log(
+        "Layar fokus, memicu fetchHomeSections untuk data awal/refresh..."
+      );
+      setIsLoading(true);
+      setError(null);
+      fetchHomeSections(
+        currentUserCoords,
+        searchQuery,
+        selectedCategoryFilter
+      ).finally(() => setIsLoading(false));
+
+      return () => {
+        // Opsional: cleanup jika diperlukan saat layar kehilangan fokus
+      };
+    }, [])
+  );
+
+  const handleRefreshWithLocation = async () => {
+    console.log("Memulai proses refresh lokasi dan jarak...");
+    setIsRefreshingLocation(true);
+    setError(null);
+
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      setError("Izin lokasi ditolak. Fitur jarak tidak dapat digunakan.");
+      setIsRefreshingLocation(false);
+      return;
+    }
+
+    try {
+      let location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const coords = location.coords;
+      setCurrentUserCoords(coords);
+      console.log("Koordinat didapat:", coords);
+
+      try {
+        let geocode = await Location.reverseGeocodeAsync(coords);
+        if (geocode && geocode.length > 0) {
+          const firstResult = geocode[0];
+          const addressString = `${firstResult.street || ""}, ${
+            firstResult.subregion || ""
+          }`;
+          setUserAddress(addressString);
+          console.log("Alamat ditemukan:", addressString);
+        } else {
+          setUserAddress("Alamat tidak dapat ditemukan");
+        }
+      } catch (geocodeError) {
+        console.error("Gagal melakukan reverse geocode:", geocodeError);
+        setUserAddress("Alamat tidak ditemukan");
+      }
+    } catch (locationError) {
+      setError(`Gagal mendapatkan lokasi: ${locationError.message}`);
+      setUserAddress("Gagal mendapatkan lokasi");
+    } finally {
+      setIsRefreshingLocation(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await apiFetch("/categories");
+      if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+      const json = await response.json();
+      if (json.categories) {
+        const transformedCategories = json.categories.map((cat) => ({
           id: cat.id.toString(),
           title: cat.name,
-          icon: { uri: cat.icon_url || "https://via.placeholder.com/40" }, // icon_url seharusnya sudah tersedia
+          icon: { uri: cat.icon_url || "https://via.placeholder.com/40" },
         }));
         setCategoriesData(transformedCategories);
       } else {
-        // Penanganan error dari response API (misal status 500 atau 4xx)
-        const errorMessage = json.message || `Status ${response.status}`;
-        throw new Error("Gagal memuat kategori: " + errorMessage);
+        throw new Error("Format respons kategori tidak valid.");
       }
     } catch (err) {
       console.error("Error fetching categories:", err);
-      setError(
-        "Error jaringan saat memuat kategori. Pastikan backend berjalan & IP benar. Detail: " +
-          err.message
+      setError((prevError) =>
+        prevError
+          ? `${prevError}\n- Gagal memuat kategori.`
+          : "Gagal memuat kategori."
       );
-      // Anda bisa menampilkan Alert di sini jika mau langsung memberi tahu user
-      // Alert.alert("Error", "Gagal memuat kategori. Coba lagi nanti.");
     }
-  }, []); // Dependensi kosong karena tidak ada props/state yang digunakan di dalamnya
+  };
 
-  const fetchPlaces = useCallback(async () => {
+  const fetchHomeSections = async (
+    userCoords,
+    currentSearchQuery,
+    currentSelectedCategoryFilter
+  ) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/places`);
+      let apiUrl = "/places?";
+      const params = [];
+
+      if (userCoords) {
+        params.push(`latitude=${userCoords.latitude}`);
+        params.push(`longitude=${userCoords.longitude}`);
+      }
+
+      if (currentSearchQuery) {
+        params.push(
+          `search_query=${encodeURIComponent(currentSearchQuery.trim())}`
+        );
+      }
+
+      if (currentSelectedCategoryFilter) {
+        params.push(`category_id=${currentSelectedCategoryFilter}`);
+      }
+
+      apiUrl += params.join("&");
+
+      console.log(`[API CALL] Memanggil API: ${apiUrl}`);
+
+      const response = await apiFetch(apiUrl);
+      if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+
       const json = await response.json();
 
-      if (response.ok) {
-        // Data tempat dari backend Anda (PlaceController@index)
-        // seharusnya sudah memiliki `main_image_url` berkat accessor di Place model.
-        const transformedFavorites = json
-          .filter((place) => {
-            // PERBAIKAN UTAMA 1: Pastikan reviews_avg_rating diparse dengan aman
-            // Backend seharusnya sudah memberikan ini sebagai float/double, tapi parsing lagi tidak ada salahnya
-            const avgRating = parseFloat(place.reviews_avg_rating);
-            // Jika bukan angka valid, perlakukan sebagai 0 untuk filtering.
-            // Rating 4.0 harusnya sudah dihitung oleh backend
-            return (isNaN(avgRating) ? 0 : avgRating) >= 4.0;
-          })
-          .map((place) => ({
-            id: place.id.toString(),
-            title: place.name,
-            // PERBAIKAN UTAMA 2: Konversi reviews_avg_rating ke angka yang aman untuk display
-            rating: (() => {
-              const avgRating = parseFloat(place.reviews_avg_rating);
-              // Jika bukan angka valid, kembalikan "N/A", jika tidak, format
-              return isNaN(avgRating) ? "N/A" : avgRating.toFixed(1);
-            })(),
-            distance: place.distance
-              ? `${place.distance.toFixed(1)} km`
+      console.log(
+        "[API RESPONSE] Respons JSON dari server (setelah filter):",
+        JSON.stringify(json, null, 2)
+      );
+
+      if (json.places) {
+        const transformedPlaces = json.places.map((place) => ({
+          id: place.id.toString(),
+          title: place.name,
+          rating: parseFloat(place.average_rating)
+            ? parseFloat(place.average_rating).toFixed(1)
+            : "N/A",
+          distance:
+            place.distance !== null && place.distance !== undefined
+              ? `${parseFloat(place.distance).toFixed(1)} km`
               : "N/A",
-            // main_image_url seharusnya sudah URL lengkap dari backend
-            image: {
-              uri: place.main_image_url || "https://via.placeholder.com/120",
-            },
-          }));
-        setFavoritesData(transformedFavorites);
+          image: {
+            uri: place.main_image_url || "https://via.placeholder.com/150",
+          },
+        }));
+
+        const favoritePlaces = transformedPlaces
+          .filter((p) => parseFloat(p.rating) >= 4.0)
+          .slice(0, 10);
+        setFavoritesData(favoritePlaces);
+        setRecommendationsData(transformedPlaces);
       } else {
-        // Penanganan error dari response API
-        const errorMessage = json.message || `Status ${response.status}`;
-        throw new Error("Gagal memuat tempat: " + errorMessage);
+        throw new Error("Format respons tempat tidak valid.");
       }
     } catch (err) {
-      console.error("Error fetching places:", err);
-      setError(
-        "Error jaringan saat memuat tempat. Pastikan backend berjalan & IP benar. Detail: " +
-          err.message
+      console.error("Error fetching places (with filter):", err);
+      setError((prevError) =>
+        prevError
+          ? `${prevError}\n- Gagal memuat tempat dengan filter.`
+          : "Gagal memuat tempat dengan filter."
       );
-      // Alert.alert("Error", "Gagal memuat tempat. Coba lagi nanti.");
-    } finally {
-      // Pastikan isLoading diatur ke false setelah kedua fetch selesai
-      // Ini bisa ditangani dengan Promise.all jika urutan fetch tidak penting
+      throw err;
     }
-  }, []); // Dependensi kosong
+  };
 
-  // Menggunakan Promise.all untuk menjalankan fetchCategories dan fetchPlaces secara paralel
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      await Promise.all([fetchCategories(), fetchPlaces()]);
-    } catch (err) {
-      // Error sudah ditangani di masing-masing fetch function,
-      // tapi ini bisa menangkap error jika Promise.all gagal secara keseluruhan
-      console.error("Failed to fetch all data:", err);
-      // setError(err.message); // Atau biarkan error dari masing-masing fetch yang terekam
-    } finally {
-      setIsLoading(false);
+  const handleCategoryPress = (categoryId) => {
+    if (selectedCategoryFilter === categoryId) {
+      setSelectedCategoryFilter(null);
+    } else {
+      setSelectedCategoryFilter(categoryId);
     }
-  }, [fetchCategories, fetchPlaces]); // Tambahkan fetchCategories dan fetchPlaces sebagai dependensi
+    setSearchQuery("");
+  };
 
-  useEffect(() => {
-    fetchData(); // Panggil fungsi fetchData yang baru
-  }, [fetchData]); // Hanya panggil sekali saat komponen dimuat
+  const renderCategoryItem = ({ item }) => (
+    <CategoryCard
+      item={item}
+      navigation={navigation}
+      onPress={() => handleCategoryPress(item.id)}
+      isSelected={selectedCategoryFilter === item.id}
+    />
+  );
+  const renderFavoriteItem = ({ item }) => (
+    <FavoriteCard item={item} navigation={navigation} />
+  );
+  const renderRecommendationItem = ({ item }) => (
+    <RecommendationCard item={item} navigation={navigation} />
+  );
 
-  const renderCategoryItem = ({ item }) => <CategoryCard item={item} />;
-  const renderFavoriteItem = ({ item }) => <FavoriteCard item={item} />;
-
-  if (isLoading) {
+  if (isLoading && recommendationsData.length === 0) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#8A2BE2" />
-        <Text>Memuat data dari server...</Text>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF8A00" />
+          <Text style={styles.loadingText}>Memuat data...</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
-  if (error) {
+  if (error && !categoriesData.length && !recommendationsData.length) {
     return (
-      <SafeAreaView style={styles.errorContainer}>
-        <Text style={styles.errorText}>Terjadi Kesalahan: {error}</Text>
-        <TouchableOpacity
-          onPress={fetchData} // Panggil fetchData untuk coba lagi
-        >
-          <Text style={styles.retryButton}>Coba Lagi</Text>
-        </TouchableOpacity>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            onPress={async () => {
+              setIsLoading(true);
+              setError(null);
+              await fetchCategories();
+              await fetchHomeSections(
+                currentUserCoords,
+                searchQuery,
+                selectedCategoryFilter
+              );
+              setIsLoading(false);
+            }}
+          >
+            <Text style={styles.retryButton}>Coba Lagi</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <AppHeader />
-        <SearchBar />
+      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <AppHeader
+          navigation={navigation}
+          onPressLocation={handleRefreshWithLocation}
+          isRefreshingLocation={isRefreshingLocation}
+          address={userAddress}
+        />
+        <SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
         <PromoBanner />
+
+        {/* Bagian yang diperbaiki/ditambahkan: Indikator loading kecil */}
+        {isLoading && recommendationsData.length > 0 && (
+          <ActivityIndicator
+            size="small"
+            color="#FF8A00"
+            style={{ marginVertical: 10 }}
+          />
+        )}
+        {error && <Text style={styles.partialErrorText}>{error}</Text>}
 
         <SectionHeader title="Jelajahi Berdasarkan Kategori" />
         <FlatList
@@ -183,14 +345,19 @@ const HomeScreen = () => {
           keyExtractor={(item) => item.id}
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.flatListContent}
+          contentContainerStyle={styles.horizontalFlatListContent}
         />
 
-        {/* --- BAGIAN REKOMENDASI --- */}
         <SectionHeader title="Rekomendasi Buat Kamu" />
-        <View style={styles.recommendationPlaceholder}>
-          <Text>Konten rekomendasi akan datang!</Text>
-        </View>
+        <FlatList
+          data={recommendationsData}
+          renderItem={renderRecommendationItem}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          scrollEnabled={false}
+          contentContainerStyle={styles.recommendationGrid}
+          columnWrapperStyle={styles.singleColumnAlignLeft}
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -199,23 +366,32 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     backgroundColor: "#f5f5f5",
+  },
+  scrollContent: {
+    paddingBottom: 20,
+    flexGrow: 1,
   },
   flatListContent: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     marginBottom: 20,
   },
-  recommendationPlaceholder: {
-    height: 150,
-    backgroundColor: "white",
-    marginHorizontal: 16,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
+  horizontalFlatListContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     marginBottom: 20,
-    borderColor: "#e0e0e0",
-    borderWidth: 1,
+  },
+  recommendationGrid: {
+    paddingVertical: 10,
+    marginBottom: 20,
+  },
+  singleColumnAlignLeft: {
+    justifyContent: "flex-start",
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    gap: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -223,23 +399,44 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#f5f5f5",
   },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#333",
+  },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
     padding: 20,
+    backgroundColor: "#f5f5f5",
   },
   errorText: {
     color: "red",
     fontSize: 16,
     textAlign: "center",
+    marginBottom: 20,
+  },
+  partialErrorText: {
+    color: "#D8000C",
+    fontSize: 14,
+    textAlign: "center",
+    marginHorizontal: 16,
     marginBottom: 10,
+    backgroundColor: "#FFD2D2",
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D8000C",
   },
   retryButton: {
     color: "#8A2BE2",
     fontSize: 16,
     fontWeight: "bold",
+    padding: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: "#8A2BE2",
   },
 });
 

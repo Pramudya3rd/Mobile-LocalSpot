@@ -1,114 +1,54 @@
-import React, { useState } from "react";
+// src/components/AppHeader.js
+import React from "react";
 import {
   View,
   Text,
   Image,
   TouchableOpacity,
   StyleSheet,
-  Platform,
-  Alert,
+  ActivityIndicator, // Import ActivityIndicator
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as Location from "expo-location"; // Pastikan ini adalah import yang benar untuk Expo Location
 
-// Catatan Penting: Pastikan TIDAK ADA import lain ke komponen lokal
-// dari folder 'src/components' di sini yang bisa menyebabkan siklus.
-// Misalnya, JANGAN import SearchBar, PromoBanner, dll. di dalam AppHeader.
-// AppHeader ini adalah komponen mandiri yang hanya bergantung pada React Native dan Expo Location.
-
-const AppHeader = () => {
-  const [currentLocation, setCurrentLocation] = useState("Rungkut Asri");
-
-  const fetchAndSetLocation = async () => {
-    setCurrentLocation("Mendapatkan lokasi...");
-
-    let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Izin Lokasi Ditolak",
-        "Aplikasi memerlukan akses lokasi Anda untuk menampilkan tempat terdekat."
-      );
-      setCurrentLocation("Izin ditolak");
-      return;
-    }
-
-    try {
-      let location = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = location.coords;
-
-      console.log(
-        `Koordinat dari emulator/perangkat: Latitude: ${latitude}, Longitude: ${longitude}`
-      );
-
-      const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
-
-      const response = await fetch(nominatimUrl, {
-        headers: {
-          "User-Agent": "LocalSpotApp/1.0 (pramu.dev@example.com)", // Ganti dengan info aplikasi Anda
-        },
-      });
-      const data = await response.json();
-
-      if (response.ok && data && data.address) {
-        const address = data.address;
-        let locationName = "Lokasi Tidak Diketahui";
-
-        if (address.road && address.city) {
-          locationName = `${address.road}, ${address.city}`;
-        } else if (address.city) {
-          locationName = address.city;
-        } else if (address.village) {
-          locationName = address.village;
-        } else if (address.town) {
-          locationName = address.town;
-        } else if (address.county) {
-          locationName = address.county;
-        } else if (data.display_name) {
-          locationName = data.display_name.split(",")[0];
-        }
-
-        setCurrentLocation(locationName);
-        console.log("Nominatim response:", data);
-      } else {
-        setCurrentLocation(
-          `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`
-        );
-        Alert.alert(
-          "Info Lokasi",
-          "Tidak dapat menemukan nama lokasi detail dari Nominatim."
-        );
-        console.log("Nominatim error or empty response:", data);
-      }
-    } catch (error) {
-      console.log("Error mendapatkan lokasi atau geocoding:", error);
-      setCurrentLocation("Gagal mendapatkan lokasi");
-      Alert.alert(
-        "Error",
-        "Tidak dapat mendapatkan lokasi Anda atau melakukan geocoding. Pastikan GPS aktif dan koneksi internet stabil."
-      );
-    }
-  };
-
-  const handleLocationIconPress = () => {
-    fetchAndSetLocation();
-  };
+// 1. Ubah props untuk menerima semua data dan fungsi dari HomeScreen
+const AppHeader = ({
+  navigation,
+  address,
+  isRefreshingLocation,
+  onPressLocation,
+}) => {
+  // TIDAK ADA LAGI useState dan fungsi fetchAndSetLocation di sini.
+  // Semua logika sudah dipindahkan ke HomeScreen.
 
   return (
     <View style={styles.header}>
       <View style={styles.locationInput}>
+        {/* 2. Gunakan onPressLocation yang diterima dari props */}
         <TouchableOpacity
-          onPress={handleLocationIconPress}
+          onPress={onPressLocation} // Panggil fungsi dari HomeScreen
           style={styles.locationIconTouchable}
+          disabled={isRefreshingLocation} // Nonaktifkan tombol saat sedang loading
         >
-          <Image
-            // Pastikan jalur gambar ini benar relative terhadap 'components/AppHeader.js'
-            source={require("../../assets/icons/icon-gps.png")}
-            style={styles.locationIcon}
-          />
+          {/* 3. Tampilkan loading spinner atau ikon berdasarkan prop isRefreshingLocation */}
+          {isRefreshingLocation ? (
+            <ActivityIndicator size="small" color="#8A2BE2" />
+          ) : (
+            <Image
+              source={require("../../assets/icons/icon-gps.png")}
+              style={styles.locationIcon}
+            />
+          )}
         </TouchableOpacity>
-        <Text style={styles.locationText}>{currentLocation}</Text>
+
+        {/* 4. Tampilkan alamat yang diterima dari props */}
+        <Text style={styles.locationText} numberOfLines={1}>
+          {address}
+        </Text>
       </View>
-      <TouchableOpacity style={styles.heartButton}>
+      <TouchableOpacity
+        style={styles.heartButton}
+        onPress={() => navigation.navigate("FavoriteList")}
+      >
         <Ionicons name="heart" size={24} color="#ff3030" />
       </TouchableOpacity>
     </View>
@@ -130,13 +70,15 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 25,
     paddingHorizontal: 15,
-    paddingVertical: 5,
+    paddingVertical: 10, // Sedikit lebih tinggi agar pas dengan ActivityIndicator
     marginRight: 10,
     borderColor: "#e0e0e0",
     borderWidth: 1,
   },
   locationIconTouchable: {
     paddingRight: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
   locationIcon: {
     width: 20,
@@ -144,8 +86,9 @@ const styles = StyleSheet.create({
     resizeMode: "contain",
   },
   locationText: {
+    flex: 1, // Agar teks bisa memendek jika terlalu panjang
     marginLeft: 0,
-    fontSize: 16,
+    fontSize: 14, // Ukuran disesuaikan
     color: "#333",
   },
   heartButton: {
@@ -153,7 +96,7 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     borderColor: "#e0e0e0",
     borderWidth: 2,
-    padding: 5,
+    padding: 8, // Padding disesuaikan
     borderRadius: 25,
   },
 });

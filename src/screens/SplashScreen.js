@@ -3,11 +3,10 @@ import React from "react";
 import { View, Image, StyleSheet } from "react-native";
 
 export default function SplashScreen() {
-  // Pastikan tidak ada spasi atau newline ekstra di sini
   return (
     <View style={styles.container}>
       <Image
-        source={require("../../assets/Logo-LocalSpot.png")} // Pastikan path ini benar
+        source={require("../../assets/Logo-LocalSpot.png")}
         style={styles.image}
         resizeMode="contain"
       />

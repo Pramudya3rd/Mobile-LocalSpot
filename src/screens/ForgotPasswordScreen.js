@@ -43,7 +43,7 @@ export default function ForgotPasswordScreen() {
 
     try {
       const BACKEND_FORGOT_PASSWORD_URL =
-        "http://10.0.2.2:8000/api/forgot-password";
+        "https://localspot.hafidzirham.com/api/forgot-password";
 
       const response = await fetch(BACKEND_FORGOT_PASSWORD_URL, {
         method: "POST",
@@ -58,20 +58,17 @@ export default function ForgotPasswordScreen() {
 
       if (response.ok) {
         setIsCodeSent(true);
-        // --- NAVIGASI KE OTPSCREEN SETELAH KODE TERKIRIM ---
-        navigation.navigate("OTPScreen", { email: email.trim() }); // Kirim email sebagai parameter
+        navigation.navigate("OTPScreen", { email: email.trim() });
       } else {
         const errorMessage =
           data.message || "Gagal mengirim kode. Pastikan email terdaftar.";
         setError(errorMessage);
-        // Alert.alert("Gagal Mengirim Kode", errorMessage); // Alert bisa dihilangkan jika ingin pesan di UI saja
       }
     } catch (err) {
       console.error("Kesalahan jaringan atau server:", err);
       setError(
         "Tidak dapat terhubung ke server. Periksa koneksi internet Anda."
       );
-      // Alert.alert("Kesalahan Jaringan", "Tidak dapat terhubung ke server."); // Alert bisa dihilangkan jika ingin pesan di UI saja
     } finally {
       setIsLoading(false);
     }

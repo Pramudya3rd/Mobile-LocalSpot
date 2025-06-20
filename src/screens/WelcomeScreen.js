@@ -11,8 +11,12 @@ import {
   Alert,
 } from "react-native";
 import LargeButton from "../components/LargeButton";
-
 import { useNavigation } from "@react-navigation/native";
+
+// =================================================================
+// === PERBAIKAN 1: Import hook 'useAuth' dari AuthContext      ===
+// =================================================================
+import { useAuth } from "../contexts/AuthContext";
 
 const IMAGES = {
   img1: require("../../assets/welcomePage/image-1.jpg"),
@@ -28,6 +32,10 @@ const IMAGES = {
 
 const WelcomeScreen = () => {
   const navigation = useNavigation();
+  // =================================================================
+  // === PERBAIKAN 2: Ambil fungsi 'continueAsGuest' dari context ===
+  // =================================================================
+  const { continueAsGuest } = useAuth();
 
   const handleLogin = () => {
     navigation.navigate("Login");
@@ -35,9 +43,17 @@ const WelcomeScreen = () => {
   const handleRegister = () => {
     navigation.navigate("Register");
   };
+
+  // =================================================================
+  // === PERBAIKAN 3: Ubah isi fungsi ini                     ===
+  // =================================================================
   const handleContinueAsGuest = () => {
-    console.log("Melanjutkan sebagai tamu ditekan! Navigasi ke Home.");
-    navigation.replace("MainAppTabs");
+    console.log("Memberi tahu AuthContext: Lanjutkan sebagai tamu.");
+    // Panggil fungsi dari context. Ini akan mengubah state 'user' secara global,
+    // dan App.js akan otomatis mengganti navigator.
+    continueAsGuest();
+    // Hapus navigasi manual dari sini
+    // navigation.replace("MainAppTabs");
   };
 
   return (
@@ -75,7 +91,7 @@ const WelcomeScreen = () => {
 
       <View style={welcomeStyles.jargonContainer}>
         <Text style={welcomeStyles.jargonText}>
-          "Temukan tempat terbaik di sekitarmu"
+          &quot;Temukan tempat terbaik di sekitarmu&quot;
         </Text>
       </View>
 

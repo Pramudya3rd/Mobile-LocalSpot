@@ -1,5 +1,5 @@
 // src/screens/OTPScreen.js
-import React, { useState, useRef } from "react"; // Impor useRef
+import React, { useState, useRef } from "react"; 
 import {
   StyleSheet,
   Text,
@@ -9,10 +9,10 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
-  Keyboard, // Impor Keyboard
+  Keyboard, 
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useRoute } from "@react-navigation/native"; // Impor useRoute
+import { useNavigation, useRoute } from "@react-navigation/native"; 
 
 import LargeButton from "../components/LargeButton";
 import LinkButton from "../components/LinkButton";
@@ -20,20 +20,16 @@ import LinkButton from "../components/LinkButton";
 export default function OTPScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { email: userEmail } = route.params || {}; // Ambil email dari ForgotPasswordScreen
+  const { email: userEmail } = route.params || {}; 
 
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]); // Array untuk setiap digit OTP
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]); 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Refs untuk setiap TextInput OTP
   const otpTextInputRefs = useRef([]);
 
-  // --- Fungsi Penanganan Input OTP ---
   const handleChangeOTP = (value, index) => {
-    // Pastikan input adalah digit
     if (!/^\d*$/.test(value)) {
-      // Hanya izinkan angka
       return;
     }
 
@@ -41,43 +37,35 @@ export default function OTPScreen() {
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Otomatis pindah fokus ke input berikutnya
     if (value && index < otp.length - 1) {
       otpTextInputRefs.current[index + 1]?.focus();
     }
-    // Otomatis pindah fokus ke input sebelumnya jika dihapus
+
     if (!value && index > 0) {
       otpTextInputRefs.current[index - 1]?.focus();
     }
-    // Sembunyikan keyboard jika OTP sudah lengkap
     if (newOtp.every((digit) => digit !== "") && index === otp.length - 1) {
       Keyboard.dismiss();
     }
   };
 
-  // --- Fungsi Verifikasi OTP ---
   const handleVerify = async () => {
     setError(null);
     setIsLoading(true);
 
-    const fullOtp = otp.join(""); // Gabungkan digit-digit OTP
+    const fullOtp = otp.join("");
 
-    // --- Validasi Client-Side ---
     if (fullOtp.length !== otp.length) {
       // Pastikan panjang OTP sesuai
       setError("Kode OTP harus 6 digit.");
       setIsLoading(false);
       return;
     }
-    // --- Akhir Validasi ---
 
-    // Di sini, kita akan menavigasi ke ResetPasswordScreen
-    // dan mengirim email serta OTP yang telah dikumpulkan
-    // Endpoint resetPassword backend akan memverifikasi OTP ini
     console.log("Navigasi ke ResetPasswordScreen dengan OTP dan Email.");
     navigation.navigate("ResetPassword", { email: userEmail, otp: fullOtp });
 
-    setIsLoading(false); // Selesai loading setelah navigasi
+    setIsLoading(false);
   };
 
   const handleBack = () => {
@@ -107,20 +95,19 @@ export default function OTPScreen() {
         </Text>
       </View>
 
-      {/* Input OTP */}
       <View style={styles.otpInputContainer}>
         {otp.map((digit, index) => (
           <TextInput
             key={index}
             style={styles.otpInput}
-            ref={(ref) => (otpTextInputRefs.current[index] = ref)} // Simpan ref
-            maxLength={1} // Hanya satu digit per input
+            ref={(ref) => (otpTextInputRefs.current[index] = ref)} 
+            maxLength={1} 
             keyboardType="number-pad"
             onChangeText={(value) => handleChangeOTP(value, index)}
             value={digit}
             onKeyPress={({ nativeEvent }) => {
               if (nativeEvent.key === "Backspace" && !otp[index] && index > 0) {
-                otpTextInputRefs.current[index - 1]?.focus(); // Pindah ke belakang saat backspace
+                otpTextInputRefs.current[index - 1]?.focus(); 
               }
             }}
           />
@@ -178,13 +165,13 @@ const styles = StyleSheet.create({
   },
   otpInputContainer: {
     flexDirection: "row",
-    justifyContent: "space-between", // Untuk jarak antar kotak OTP
-    marginBottom: 40, // Jarak dari input OTP ke tombol
-    height: 60, // Tinggi container OTP
+    justifyContent: "space-between", 
+    marginBottom: 40, 
+    height: 60,
   },
   otpInput: {
-    width: 50, // Lebar kotak OTP
-    height: 50, // Tinggi kotak OTP
+    width: 50, 
+    height: 50, 
     borderColor: "#ddd",
     borderWidth: 1,
     borderRadius: 8,
@@ -193,7 +180,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
     backgroundColor: "white",
-    shadowOpacity: 0.1, // Opsional: bayangan ringan
+    shadowOpacity: 0.1,
     shadowRadius: 5,
     shadowColor: "#000",
     shadowOffset: { height: 2, width: 0 },

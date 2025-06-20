@@ -1,349 +1,396 @@
-// src/screens/ProfileScreen.js
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
-  Text,
   View,
-  TouchableOpacity,
-  StatusBar,
+  SafeAreaView,
+  Text,
   ScrollView,
+  TouchableOpacity,
   Image,
+  StatusBar,
+  Platform,
   Alert,
+  ActivityIndicator, // Import ActivityIndicator untuk loading
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker"; // Import ImagePicker untuk upload
+import { useAuth } from "../contexts/AuthContext"; // Import hook useAuth
 
-// --- Komponen Pembantu (BottomTabButton, DIHILANGKAN DARI SINI) ---
-// Hapus semua kode BottomTabButton di sini jika ada
-// --- Akhir Komponen Pembantu ---
-
-export default function ProfileScreen() {
+const ProfileScreen = () => {
   const navigation = useNavigation();
 
-  const [profileData, setProfileData] = useState({
-    name: "Hafidz Irham A.",
-    email: "youremail@domain.com",
-    phone: "08123456789",
-    profilePic:
-      "https://images.unsplash.com/photo-1534528736697-5ae52796e949?auto=format&fit=crop&q=80&w=1974&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    notificationStatus: "Aktif",
-    appLanguage: "Bahasa Indonesia",
-  });
+  // Ambil data dan fungsi yang relevan dari AuthContext
+  const { user, logout, uploadProfilePhoto } = useAuth();
 
-  // --- HAPUS STATE INI ---
-  // const [activeTab, setActiveTab] = useState('Profile');
+  // State loading khusus untuk proses upload foto
+  const [isUploading, setIsUploading] = useState(false);
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      // ... (kode untuk memuat profil dari AsyncStorage/API, jika ada) ...
-    };
-    loadProfile();
-  }, []);
+  // Fungsi ini sekarang hanya untuk navigasi ke halaman edit info teks
+  const handleNavigateToEdit = () => {
+    navigation.navigate("InformasiPribadi");
+  };
 
-  const handleBack = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      navigation.replace("Home");
+  // Fungsi baru untuk menangani pemilihan dan upload foto profil
+  const handlePhotoChange = async () => {
+    // 1. Minta izin akses galeri
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Izin Diperlukan",
+        "Aplikasi memerlukan akses ke galeri foto Anda."
+      );
+      return;
+    }
+
+    // 2. Buka galeri gambar
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1], // Foto profil biasanya persegi
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const photo = result.assets[0];
+
+      // 3. Buat FormData untuk dikirim ke backend
+      const formData = new FormData();
+      const uriParts = photo.uri.split(".");
+      const fileType = uriParts[uriParts.length - 1];
+
+      formData.append("photo", {
+        uri: photo.uri,
+        name: `profile_${user.id}.${fileType}`,
+        type: `image/${fileType}`,
+      });
+
+      // 4. Panggil fungsi dari context untuk memulai proses upload
+      setIsUploading(true);
+      try {
+        await uploadProfilePhoto(formData);
+        Alert.alert("Berhasil", "Foto profil berhasil diperbarui!");
+      } catch (error) {
+        Alert.alert("Gagal", error.message || "Gagal mengupload foto.");
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
-  const handleEditProfilePic = () => {
-    Alert.alert("Edit Foto Profil", "Fitur edit foto profil akan datang.");
-  };
-
-  const handleNavigateTo = (screenName) => {
-    if (screenName === "AddPlace") {
-      navigation.navigate(screenName);
-    } else {
-      Alert.alert("Navigasi", `Menuju ${screenName}`);
+  // Fungsi untuk menangani klik pada item menu lainnya
+  const handleMenuItemPress = (routeName) => {
+    if (!user || user.isGuest) {
+      Alert.alert(
+        "Perlu Login",
+        "Anda harus login untuk mengakses fitur ini.",
+        [
+          { text: "Login atau Daftar", onPress: logout },
+          { text: "Batal", style: "cancel" },
+        ]
+      );
+      return;
     }
+    navigation.navigate(routeName);
   };
 
-  const handleLogout = async () => {
-    Alert.alert(
-      "Logout",
-      "Apakah Anda yakin ingin logout?",
-      [
-        { text: "Batal", style: "cancel" },
-        {
-          text: "Logout",
-          onPress: async () => {
-            await AsyncStorage.removeItem("userToken");
-            navigation.replace("Login");
-          },
-          style: "destructive",
-        },
-      ],
-      { cancelable: true }
+  // Fungsi untuk logout
+  const handleLogout = () => {
+    Alert.alert("Konfirmasi Logout", "Apakah Anda yakin ingin keluar?", [
+      { text: "Batal", style: "cancel" },
+      { text: "Logout", onPress: logout },
+    ]);
+  };
+
+  // Tampilan "Penjaga Gerbang" jika pengguna belum login atau adalah tamu
+  if (!user || user.isGuest) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.guestView}>
+          <Ionicons name="person-circle-outline" size={80} color="#ccc" />
+          <Text style={styles.guestTitle}>Halaman Profil</Text>
+          <Text style={styles.guestText}>
+            Silakan login atau daftar untuk melihat profil Anda dan mengakses
+            fitur lainnya.
+          </Text>
+          <TouchableOpacity
+            style={styles.guestButton}
+            onPress={logout} // Memanggil logout akan membawa ke halaman Welcome/Login
+          >
+            <Text style={styles.guestButtonText}>Login atau Daftar</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
-  };
+  }
 
-  // --- HAPUS FUNGSI INI ---
-  // const handleTabPress = (tabName) => {
-  //   setActiveTab(tabName);
-  //   if (tabName === 'Beranda') {
-  //     navigation.navigate('Home');
-  //   } else if (tabName === 'Tambah') {
-  //     navigation.navigate('AddPlace');
-  //   } else if (tabName === 'Profile') {
-  //     // Sudah di ProfileScreen, tidak perlu navigasi
-  //   }
-  // };
-
+  // Tampilan utama jika pengguna sudah login
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
-
-      {/* Header Halaman */}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
+        {navigation.canGoBack() && (
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+        )}
         <Text style={styles.headerTitle}>Profil</Text>
+        <View style={styles.placeholder} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollViewContent}>
-        {/* Bagian Foto Profil dan Info */}
-        <View style={styles.profileSection}>
-          <View style={styles.profilePicContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.profileHeader}>
+          <View style={styles.avatarContainer}>
             <Image
-              source={{ uri: profileData.profilePic }}
-              style={styles.profilePic}
+              source={{
+                uri:
+                  user.profile_picture_url ||
+                  `https://ui-avatars.com/api/?name=${user.username}&background=ADD8E6&color=FFFFFF&size=128`,
+              }}
+              style={styles.avatar}
             />
+            {/* Tombol pensil sekarang untuk ganti foto */}
             <TouchableOpacity
-              style={styles.editIcon}
-              onPress={handleEditProfilePic}
+              onPress={handlePhotoChange}
+              style={styles.editButton}
+              disabled={isUploading}
             >
-              <Ionicons name="pencil-outline" size={18} color="white" />
+              {isUploading ? (
+                <ActivityIndicator size="small" color="#333" />
+              ) : (
+                <Ionicons name="camera-outline" size={20} color="#333" />
+              )}
             </TouchableOpacity>
           </View>
-          <Text style={styles.profileName}>{profileData.name}</Text>
-          <Text style={styles.profileContact}>
-            {profileData.email} | {profileData.phone}
-          </Text>
+          <Text style={styles.userName}>{user.username}</Text>
+          <Text style={styles.userInfo}>{user.email}</Text>
         </View>
 
-        {/* Daftar Opsi Profil */}
-        <View style={styles.optionsList}>
-          {/* Informasi Pribadi */}
+        <View style={styles.menuContainer}>
+          {/* Menu Item "Informasi Pribadi" sekarang untuk edit teks */}
           <TouchableOpacity
-            style={styles.optionItem}
-            onPress={() => handleNavigateTo("Informasi Pribadi")}
+            style={styles.menuItem}
+            onPress={handleNavigateToEdit}
           >
-            <Ionicons name="document-text-outline" size={24} color="#555" />
-            <Text style={styles.optionText}>Informasi Pribadi</Text>
             <Ionicons
-              name="chevron-forward-outline"
-              size={20}
-              color="#999"
-              style={styles.optionArrow}
+              name="document-text-outline"
+              size={24}
+              color="#555"
+              style={styles.menuIcon}
             />
+            <Text style={styles.menuText}>Informasi Pribadi</Text>
+            <Ionicons name="chevron-forward-outline" size={20} color="#999" />
           </TouchableOpacity>
 
-          {/* Notifikasi */}
           <TouchableOpacity
-            style={styles.optionItem}
-            onPress={() => handleNavigateTo("Notifikasi")}
+            style={styles.menuItem}
+            onPress={() => handleMenuItemPress("MyReviews")}
           >
-            <Ionicons name="notifications-outline" size={24} color="#555" />
-            <Text style={styles.optionText}>Notifikasi</Text>
-            <Text style={styles.optionValue}>
-              {profileData.notificationStatus}
-            </Text>
             <Ionicons
-              name="chevron-forward-outline"
-              size={20}
-              color="#999"
-              style={styles.optionArrow}
+              name="star-outline"
+              size={24}
+              color="#555"
+              style={styles.menuIcon}
             />
+            <Text style={styles.menuText}>Ulasan Saya</Text>
+            <Ionicons name="chevron-forward-outline" size={20} color="#999" />
           </TouchableOpacity>
 
-          {/* Bahasa Aplikasi */}
           <TouchableOpacity
-            style={styles.optionItem}
-            onPress={() => handleNavigateTo("Bahasa")}
+            style={styles.menuItem}
+            onPress={() => handleMenuItemPress("MyAddedPlaces")}
           >
-            <Ionicons name="language-outline" size={24} color="#555" />
-            <Text style={styles.optionText}>Bahasa Aplikasi</Text>
-            <Text style={styles.optionValue}>{profileData.appLanguage}</Text>
             <Ionicons
-              name="chevron-forward-outline"
-              size={20}
-              color="#999"
-              style={styles.optionArrow}
+              name="location-outline"
+              size={24}
+              color="#555"
+              style={styles.menuIcon}
             />
+            <Text style={styles.menuText}>Tempat Tambahan Saya</Text>
+            <Ionicons name="chevron-forward-outline" size={20} color="#999" />
           </TouchableOpacity>
 
-          {/* Tambahkan Tempat Saya */}
           <TouchableOpacity
-            style={styles.optionItem}
-            onPress={() => handleNavigateTo("AddPlace")}
+            style={styles.menuItem}
+            onPress={() => navigation.navigate("AboutApp")}
           >
-            <Ionicons name="location-outline" size={24} color="#555" />
-            <Text style={styles.optionText}>Tambahkan Tempat Saya</Text>
             <Ionicons
-              name="chevron-forward-outline"
-              size={20}
-              color="#999"
-              style={styles.optionArrow}
+              name="information-circle-outline"
+              size={24}
+              color="#555"
+              style={styles.menuIcon}
             />
-          </TouchableOpacity>
-
-          {/* Ulasan Saya */}
-          <TouchableOpacity
-            style={styles.optionItem}
-            onPress={() => handleNavigateTo("Ulasan Saya")}
-          >
-            <Ionicons name="star-outline" size={24} color="#555" />
-            <Text style={styles.optionText}>Ulasan Saya</Text>
-            <Ionicons
-              name="chevron-forward-outline"
-              size={20}
-              color="#999"
-              style={styles.optionArrow}
-            />
+            <Text style={styles.menuText}>Tentang Aplikasi</Text>
+            <Ionicons name="chevron-forward-outline" size={20} color="#999" />
           </TouchableOpacity>
         </View>
 
-        {/* Tombol Logout */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutButtonText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
-
-      {/* Bottom Navigation Bar (DIHILANGKAN DARI SINI) */}
-      {/* Hapus seluruh View untuk bottomNavBar jika ada */}
-    </View>
+    </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: "#F7F7F7",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+    backgroundColor: "#f5f5f5",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 20,
-    backgroundColor: "white",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
-    marginBottom: 20,
+  },
+  backButton: {
+    padding: 5,
+    width: 24,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: "bold",
     color: "#333",
-    marginLeft: 20,
+    flex: 1,
+    textAlign: "center",
   },
-  scrollViewContent: {
-    paddingBottom: 90,
+  placeholder: {
+    width: 24,
   },
-  profileSection: {
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  profileHeader: {
+    backgroundColor: "#fff",
     alignItems: "center",
-    marginBottom: 30,
-    paddingHorizontal: 20,
+    paddingVertical: 30,
+    marginBottom: 20,
+    position: "relative",
   },
-  profilePicContainer: {
+  avatarContainer: {
+    position: "relative",
+    marginBottom: 10,
+  },
+  avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: "#ddd",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
     borderWidth: 2,
-    borderColor: "white",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
+    borderColor: "#eee",
   },
-  profilePic: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 50,
-  },
-  editIcon: {
+  editButton: {
     position: "absolute",
     bottom: 0,
     right: 0,
-    backgroundColor: "#FF8C69",
-    borderRadius: 15,
-    padding: 5,
-    borderWidth: 2,
-    borderColor: "white",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  profileName: {
-    fontSize: 22,
+  userName: {
+    fontSize: 20,
     fontWeight: "bold",
     color: "#333",
     marginBottom: 5,
   },
-  profileContact: {
+  userInfo: {
     fontSize: 14,
-    color: "gray",
+    color: "#777",
   },
-  optionsList: {
-    backgroundColor: "white",
+  menuContainer: {
+    backgroundColor: "#fff",
     borderRadius: 10,
-    marginHorizontal: 20,
-    marginBottom: 30,
-    overflow: "hidden",
+    marginHorizontal: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    elevation: 2,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    marginBottom: 20,
   },
-  optionItem: {
+  menuItem: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 15,
-    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#f0f0f0",
   },
-  optionText: {
+  menuIcon: {
+    marginRight: 15,
+    width: 24,
+    textAlign: "center",
+  },
+  menuText: {
+    flex: 1,
     fontSize: 16,
     color: "#333",
-    marginLeft: 15,
-    flex: 1,
-  },
-  optionValue: {
-    fontSize: 14,
-    color: "#FF8C69",
-    marginRight: 10,
-  },
-  optionArrow: {
-    marginLeft: 5,
   },
   logoutButton: {
-    backgroundColor: "#FF3030",
+    backgroundColor: "#FF3B30",
     borderRadius: 10,
+    marginHorizontal: 16,
     paddingVertical: 15,
-    marginHorizontal: 20,
     alignItems: "center",
-    marginBottom: 30,
+    elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
-    elevation: 2,
   },
   logoutButtonText: {
-    fontSize: 18,
+    color: "#fff",
+    fontSize: 16,
     fontWeight: "bold",
-    color: "white",
   },
-  // --- HAPUS STYLE INI ---
-  // bottomNavBar: { ... },
-  // bottomTabButton: { ... },
-  // bottomTabButtonText: { ... },
+  guestView: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#f5f5f5",
+  },
+  guestTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#333",
+    marginTop: 20,
+  },
+  guestText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  guestButton: {
+    backgroundColor: "#8A2BE2",
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+  },
+  guestButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
 });
+
+export default ProfileScreen;

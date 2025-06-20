@@ -1,7 +1,7 @@
 // src/components/ReviewCard.js
 import React from "react";
 import { View, Text, StyleSheet, Image } from "react-native";
-// import { Ionicons } from '@expo/vector-icons'; // Import jika ReviewCard pakai ikon rating
+
 
 const ReviewCard = ({ review }) => {
   return (
@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 1, // For Android shadow
+    elevation: 1,
   },
   header: {
     flexDirection: "row",
@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
   userImage: {
     width: 40,
     height: 40,
-    borderRadius: 20, // Bentuk lingkaran
+    borderRadius: 20,
     marginRight: 10,
   },
   userName: {
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
     color: "gray",
   },
   rating: {
-    marginLeft: "auto", // Dorong ke kanan
+    marginLeft: "auto",
     fontWeight: "bold",
     color: "#FF8C69",
   },

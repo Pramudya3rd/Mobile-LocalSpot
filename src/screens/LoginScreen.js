@@ -1,4 +1,3 @@
-// src/screens/LoginScreen.js
 import React, { useState } from "react";
 import {
   StyleSheet,
@@ -7,13 +6,16 @@ import {
   TextInput,
   TouchableOpacity,
   StatusBar,
-  Alert,
-  ActivityIndicator, // Untuk indikator loading
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // Untuk menyimpan token
-
 import { useNavigation } from "@react-navigation/native";
+
+// Hapus import AsyncStorage karena tidak lagi dibutuhkan di sini
+// import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// Import hook 'useAuth' dari AuthContext
+import { useAuth } from "../contexts/AuthContext";
 
 import LargeButton from "../components/LargeButton";
 import LinkButton from "../components/LinkButton";
@@ -22,121 +24,55 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // State untuk indikator loading
-  const [error, setError] = useState(null); // State untuk pesan error
+  const [error, setError] = useState(null); // State error lokal untuk form
 
   const navigation = useNavigation();
 
-  // --- Fungsi Penanganan Event ---
-  const handleLogin = async () => {
-    setError(null); // Reset pesan error sebelumnya
-    setIsLoading(true); // Mulai loading
+  // Ambil fungsi 'login' dan status 'isLoading' dari AuthContext
+  const { login, isLoading } = useAuth();
 
-    // --- Validasi Input Client-Side ---
+  const handleLogin = async () => {
+    setError(null);
+
+    // Validasi Sederhana di sisi klien
     if (!email.trim() || !password.trim()) {
       setError("Email dan password tidak boleh kosong.");
-      setIsLoading(false);
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      setError("Format email tidak valid.");
-      setIsLoading(false);
-      return;
-    }
-    if (password.length < 6) {
-      // Contoh: password minimal 6 karakter
-      setError("Password minimal 6 karakter.");
-      setIsLoading(false);
-      return;
-    }
-    // --- Akhir Validasi Input Client-Side ---
 
     try {
-      // --- PANGGIL API LOGIN BACKEND ANDA DI SINI ---
-      // GANTI URL placeholder ini dengan URL endpoint login backend Anda yang sebenarnya.
-      // Jika backend di localhost, gunakan IP address komputer Anda di jaringan lokal, BUKAN 'localhost' atau '127.0.0.1'.
-      // Contoh: 'http://192.168.1.100:8000/api/login' (ganti IP dan port sesuai backend Anda)
-      const BACKEND_LOGIN_URL = "http://10.0.2.2:8000/api/login"; // <-- GANTI INI!
+      // Panggil fungsi login dari context.
+      // AuthContext yang akan menangani API call, penyimpanan token, dan update state global.
+      await login(email.trim(), password.trim());
 
-      const response = await fetch(BACKEND_LOGIN_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          email: email.trim(),
-          password: password.trim(),
-        }),
-      });
-
-      const data = await response.json(); // Ambil respons JSON dari backend
-
-      if (response.ok) {
-        // Jika status HTTP 200-299 (login berhasil)
-        if (data.token) {
-          // Asumsi backend mengembalikan properti 'token'
-          await AsyncStorage.setItem("userToken", data.token); // Simpan token
-          // Opsional: Simpan juga informasi user lainnya:
-          // await AsyncStorage.setItem('userInfo', JSON.stringify(data.user));
-
-          Alert.alert("Login Berhasil", "Selamat datang kembali!");
-          setEmail(""); // Bersihkan input
-          setPassword(""); // Bersihkan input
-
-          navigation.replace("MainAppTabs"); // Navigasi ke layar utama (HomeScreen)
-        } else {
-          setError("Login berhasil, tapi tidak ada token diterima.");
-          Alert.alert(
-            "Login Berhasil",
-            "Selamat datang kembali! (Token tidak diterima)"
-          );
-          navigation.replace("MainAppTabs"); // Tetap navigasi
-        }
-      } else {
-        // Jika status HTTP 4xx atau 5xx (login gagal)
-        const errorMessage =
-          data.message || "Email atau password salah. Silakan coba lagi.";
-        setError(errorMessage);
-        // Alert bisa dihilangkan jika error sudah tampil di UI
-      }
+      // Jika login berhasil, AuthContext akan mengubah state 'user'
+      // dan navigator utama Anda akan otomatis berpindah layar.
+      // Anda mungkin tidak perlu navigasi manual di sini jika navigator sudah diatur.
+      // Jika masih perlu, pastikan tujuannya benar.
+      navigation.replace("MainAppTabs");
     } catch (err) {
-      console.error("Kesalahan jaringan atau server:", err);
-      setError(
-        "Tidak dapat terhubung ke server. Periksa koneksi internet Anda atau URL API."
-      );
-    } finally {
-      setIsLoading(false); // Selesai loading
+      // Jika login di context gagal (misal: password salah), ia akan melempar error
+      // yang bisa kita tangkap dan tampilkan di sini.
+      setError(err.message || "Terjadi kesalahan saat login.");
     }
   };
 
   const handleForgotPassword = () => {
     navigation.navigate("ForgotPassword");
   };
-
   const handleRegisterNow = () => {
     navigation.navigate("Register");
   };
-
   const handleBack = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      Alert.alert(
-        "Tidak Bisa Kembali",
-        "Tidak ada layar sebelumnya di tumpukan."
-      );
-    }
+    if (navigation.canGoBack()) navigation.goBack();
   };
-
   const togglePasswordVisibility = () => {
     setIsPasswordVisible(!isPasswordVisible);
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar barStyle="dark-content" />
 
       <TouchableOpacity style={styles.backButton} onPress={handleBack}>
         <Ionicons name="arrow-back" size={24} color="#333" />
@@ -155,7 +91,6 @@ export default function LoginScreen() {
           onChangeText={setEmail}
           placeholderTextColor="#999"
           autoCapitalize="none"
-          autoCorrect={false}
         />
 
         <View style={styles.passwordInputContainer}>
@@ -166,8 +101,6 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             placeholderTextColor="#999"
-            autoCapitalize="none"
-            autoCorrect={false}
           />
           <TouchableOpacity
             style={styles.eyeIcon}
@@ -182,7 +115,6 @@ export default function LoginScreen() {
         </View>
       </View>
 
-      {/* Tampilkan pesan error jika ada */}
       {error && <Text style={styles.errorMessage}>{error}</Text>}
 
       <View style={styles.forgotPasswordContainer}>
@@ -194,10 +126,10 @@ export default function LoginScreen() {
       </View>
 
       <LargeButton
-        title={isLoading ? "" : "Login"} // Teks kosong jika loading
+        title={isLoading ? "" : "Login"}
         onPress={handleLogin}
         type="primary"
-        disabled={isLoading} // Nonaktifkan tombol saat loading
+        disabled={isLoading}
       >
         {isLoading && <ActivityIndicator size="small" color="#fff" />}
       </LargeButton>
@@ -225,6 +157,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginBottom: 35,
+    alignSelf: "flex-start",
   },
   welcomeContainer: {
     marginBottom: 40,

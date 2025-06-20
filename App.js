@@ -1,83 +1,123 @@
 // App.js
-import React, { useState, useEffect } from "react";
-import { StatusBar } from "expo-status-bar";
-import { View } from "react-native"; // View diimpor tapi tidak dipakai, bisa dihapus kalau tidak perlu
-
+import React, { useState, useEffect } from "react"; // <-- 1. Import useState dan useEffect
+import { StatusBar } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createStackNavigator } from "@react-navigation/stack";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-// Import semua Screens Anda
+import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
+
+// Import Semua Screen Anda
 import SplashScreen from "./src/screens/SplashScreen";
 import WelcomeScreen from "./src/screens/WelcomeScreen";
 import LoginScreen from "./src/screens/LoginScreen";
-// HomeScreen tidak lagi langsung di Stack.Screen karena akan ada di dalam AppNavigator
-// import HomeScreen from "./src/screens/HomeScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
 import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
 import OTPScreen from "./src/screens/OTPScreen";
 import ResetPasswordScreen from "./src/screens/ResetPasswordScreen";
-// PlaceCard, ReviewCard, FeatureButton adalah komponen, bukan screen navigasi
-// import PlaceCard from "./src/components/PlaceCard";
-// import ReviewCard from "./src/components/ReviewCard";
-// import FeatureButton from "./src/components/FeatureButton";
-import PlaceDetailScreen from "./src/screens/PlaceDetailScreen";
-// Import AppNavigator Anda (ini adalah Bottom Tab Navigator)
+import DetailTempatScreen from "./src/screens/DetailTempat";
+import AllReviewsScreen from "./src/screens/AllReviewsScreen";
 import AppNavigator from "./src/navigation/AppNavigator";
+import AddPlaceScreen from "./src/screens/AddPlaceScreen";
+import MyReviewScreen from "./src/screens/MyReviewScreen";
+import AboutAppScreen from "./src/screens/AboutAppScreen";
+import MyAddedPlacesScreen from "./src/screens/MyAddedPlacesScreen";
+import ManageMyPlaceScreen from "./src/screens/ManageMyPlaceScreen";
+import InformasiPribadiScreen from "./src/screens/InformasiPribadiScreen";
+import FavoriteScreen from "./src/screens/FavoriteScreen";
+import EditPlaceScreen from "./src/screens/EditPlaceScreen";
 
-const Stack = createNativeStackNavigator();
+const Stack = createStackNavigator();
 
-export default function App() {
-  const [appIsReady, setAppIsReady] = useState(false);
+const AppRootNavigator = () => {
+  // Ambil state dari AuthContext. Kita ganti nama 'isLoading' menjadi 'isAuthLoading' agar tidak bentrok.
+  const { user, isLoading: isAuthLoading } = useAuth();
+
+  // =================================================================
+  // === PERBAIKAN: Tambahkan state untuk timer splash screen       ===
+  // =================================================================
+  const [isMinTimePassed, setIsMinTimePassed] = useState(false);
 
   useEffect(() => {
-    async function prepareApp() {
-      try {
-        // Simulasikan waktu loading (misalnya untuk memuat aset, cek token, dll.)
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        // Di sini Anda bisa menambahkan logika untuk mengecek apakah pengguna sudah login
-        // Jika sudah login, set initialRouteName ke 'MainAppTabs' (AppNavigator)
-        // Jika belum, biarkan di 'Welcome'
-      } catch (e) {
-        console.warn(e);
-      } finally {
-        setAppIsReady(true);
-      }
-    }
-    prepareApp();
-  }, []);
+    // Jalankan timer selama 3 detik
+    const timer = setTimeout(() => {
+      setIsMinTimePassed(true);
+    }, 3000); // 3000 milidetik = 3 detik
 
-  if (!appIsReady) {
+    // Cleanup function untuk membersihkan timer jika komponen unmount
+    return () => clearTimeout(timer);
+  }, []); // Array kosong berarti efek ini hanya berjalan sekali saat komponen mount
+
+  // =================================================================
+  // === PERBAIKAN: Ubah kondisi untuk menampilkan SplashScreen     ===
+  // =================================================================
+  // Tampilkan SplashScreen jika pengecekan auth BELUM selesai ATAU timer 3 detik BELUM selesai.
+  if (!isMinTimePassed || isAuthLoading) {
     return <SplashScreen />;
   }
 
   return (
-    <NavigationContainer>
-      <StatusBar style="dark" />
-      <Stack.Navigator
-        initialRouteName="Welcome" // Atau 'MainAppTabs' jika pengguna sudah login
-        screenOptions={{ headerShown: false }} // Menyembunyikan header untuk semua screen di Stack ini
-      >
-        {/* Screens untuk Alur Autentikasi */}
-        <Stack.Screen name="Welcome" component={WelcomeScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-        <Stack.Screen name="OTPScreen" component={OTPScreen} />
-        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-        <Stack.Screen name="AddScreen" component={PlaceDetailScreen} />
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {user ? (
+        // --- JIKA PENGGUNA SUDAH LOGIN (atau sebagai Tamu) ---
+        <>
+          <Stack.Screen name="MainAppTabs" component={AppNavigator} />
+          <Stack.Screen name="DetailTempat" component={DetailTempatScreen} />
+          <Stack.Screen name="AllReviews" component={AllReviewsScreen} />
+          <Stack.Screen name="AddPlace" component={AddPlaceScreen} />
+          <Stack.Screen name="AboutApp" component={AboutAppScreen} />
+          <Stack.Screen name="MyReviews" component={MyReviewScreen} />
+          <Stack.Screen name="MyAddedPlaces" component={MyAddedPlacesScreen} />
+          <Stack.Screen name="ManageMyPlace" component={ManageMyPlaceScreen} />
+          <Stack.Screen name="EditPlaceScreen" component={EditPlaceScreen} />
+          <Stack.Screen
+            name="InformasiPribadi"
+            component={InformasiPribadiScreen}
+          />
+          <Stack.Screen name="FavoriteList" component={FavoriteScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+          <Stack.Screen
+            name="ForgotPassword"
+            component={ForgotPasswordScreen}
+          />
+          <Stack.Screen name="OTPScreen" component={OTPScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+        </>
+      ) : (
+        // --- JIKA PENGGUNA BELUM LOGIN ---
+        <>
+          <Stack.Screen
+            name="Welcome"
+            component={WelcomeScreen}
+            options={{ animationEnabled: false }}
+          />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen
+            name="ForgotPassword"
+            component={ForgotPasswordScreen}
+          />
+          <Stack.Screen name="OTPScreen" component={OTPScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        </>
+      )}
+    </Stack.Navigator>
+  );
+};
 
-        {/* Screen untuk Main App Tabs (AppNavigator) */}
-        {/* Ketika pengguna masuk ke "MainAppTabs", maka Bottom Tab Navigator akan muncul */}
-        <Stack.Screen name="MainAppTabs" component={AppNavigator} />
-
-        {/* Screens yang mungkin diakses DARI DALAM tab (misal: PlaceDetail dari HomeScreen) */}
-        {/* PlaceDetailScreen tetap di Stack utama agar bisa diakses dari mana saja (misal: dari HomeScreen yang ada di dalam MainAppTabs) */}
-        <Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} />
-
-        {/* HomeScreen dihapus dari sini karena sekarang menjadi bagian dari AppNavigator (Bottom Tabs) */}
-        {/* <Stack.Screen name="Home" component={HomeScreen} /> */}
-      </Stack.Navigator>
-      {/* <AppNavigator /> <-- INI HARUS DIHAPUS karena sudah di nesting di atas */}
-    </NavigationContainer>
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <NavigationContainer>
+          <StatusBar
+            barStyle="dark-content"
+            backgroundColor="#ffffff"
+            translucent={false}
+          />
+          <AppRootNavigator />
+        </NavigationContainer>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

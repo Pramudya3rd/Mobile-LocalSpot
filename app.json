@@ -1,28 +1,32 @@
 {
   "expo": {
-    "name": "LocalSpot",
-    "slug": "LocalSpot",
+    "name": "MobileLocalSpot",
+    "slug": "MobileLocalSpot",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "icon": "./assets/images/icon.png",
+    "scheme": "mobilelocalspot",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "dev.phs.mobilelocalspot",
+      "theme": "@style/Theme.MaterialComponents.DayNight.NoActionBar"
     },
     "web": {
-      "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "packagerOpts": {
-      "https": true
+    "extra": {
+      "eas": {
+        "projectId": "a3bf46e9-63a2-42a3-bcaa-655a95c01fd0"
+      }
     }
   }
 }

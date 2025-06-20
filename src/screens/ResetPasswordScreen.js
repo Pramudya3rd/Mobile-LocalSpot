@@ -1,4 +1,3 @@
-// src/screens/ResetPasswordScreen.js
 import React, { useState } from "react";
 import {
   StyleSheet,
@@ -49,7 +48,7 @@ export default function ResetPasswordScreen() {
 
     try {
       const BACKEND_RESET_PASSWORD_URL =
-        "http://10.0.2.2:8000/api/reset-password"; // <-- GANTI INI!
+        "https://localspot.hafidzirham.com/api/reset-password"; // <-- GANTI INI DENGAN URL API ANDA YANG ASLI!
 
       const response = await fetch(BACKEND_RESET_PASSWORD_URL, {
         method: "POST",
@@ -112,14 +111,12 @@ export default function ResetPasswordScreen() {
       </TouchableOpacity>
 
       <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>Create new password</Text>{" "}
-        {/* HAPUS {" "} DI SINI */}
-        {/* Sesuai desain */}
+        <Text style={styles.headerTitle}>Create new password</Text>
+        {/* Tidak ada lagi {" "} di sini */}
         <Text style={styles.headerSubText}>
           Your new password must be unique from those previously used.
-        </Text>{" "}
-        {/* HAPUS {" "} DI SINI */}
-        {/* Sesuai desain */}
+        </Text>
+        {/* Tidak ada lagi {" "} di sini */}
       </View>
 
       <View style={styles.inputContainer}>

@@ -1,10 +1,12 @@
-// src/components/FavoriteCard.js
+// src/components/RecommendationCard.js
 import React from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native'; // Import useNavigation
 
-const FavoriteCard = ({ item }) => {
+const { width } = Dimensions.get('window');
+
+const RecommendationCard = ({ item }) => {
   const navigation = useNavigation();
 
   const handlePress = () => {
@@ -36,11 +38,14 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
     borderRadius: 15,
-    flexDirection: 'column', // Sesuaikan jika desain FavoriteCard Anda lebih ke arah row
-    marginRight: 12, // Margin antar kartu horizontal
     overflow: 'hidden',
-    width: 250, // Lebar tetap untuk kartu horizontal, sesuaikan
-    height: 180, // Tinggi tetap, sesuaikan
+    // Sesuaikan lebar ini agar sesuai dengan `gap` dan `paddingHorizontal` di HomeScreen
+    // Formula: (lebar_layar - (paddingHorizontal_FlatList_di_HomeScreen * 2) - (gap_antar_kolom)) / 2
+    // HomeScreen: paddingHorizontal: 16 (total 32), gap: 16
+    // Jadi: (width - 32 - 16) / 2 = (width - 48) / 2
+    width: (width - 48) / 2, 
+    // Tidak ada marginHorizontal di sini, karena sudah dihandle oleh `gap` di FlatList `columnWrapperStyle`
+    marginBottom: 16, // Jarak antar baris kartu
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -62,7 +67,6 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     padding: 10,
-    flex: 1,
   },
   title: {
     fontSize: 16,
@@ -90,4 +94,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FavoriteCard;
+export default RecommendationCard;

@@ -1,68 +1,133 @@
+// screens/PlaceDetailScreen.js
 import React, { useState, useEffect } from "react";
 import {
-  View,
-  Text,
-  Image,
   StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+  Text,
+  View,
   SafeAreaView,
-  StatusBar,
-  ActivityIndicator, // Untuk indikator loading
-  Alert, // Untuk menampilkan pesan error
+  ScrollView,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  TextInput, // <-- Tambahkan ini untuk input komentar
 } from "react-native";
-import { AntDesign, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
-import axios from "axios"; // Pastikan Anda sudah menginstal axios: npm install axios
+import { Ionicons } from "@expo/vector-icons";
+import { useRoute, useNavigation } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // <-- Tambahkan ini
 
-// Konstanta URL API Anda
-// Ganti dengan IP address lokal komputer Anda atau domain backend Anda
-// Contoh: const API_BASE_URL = 'http://192.168.1.100:8000/api';
-// Untuk development, bisa juga 'http://localhost:8000/api' jika di emulator dan backend berjalan lokal
-const API_BASE_URL = "http://10.0.2.2:8000/api"; // Contoh untuk Android Emulator ke localhost backend
-// Untuk iOS simulator, bisa 'http://localhost:8000/api'
-// Pastikan server Laravel Anda berjalan (php artisan serve)
+const API_BASE_URL = "http://10.0.2.2:8000/api";
 
-const PlaceDetailScreen = ({ route, navigation }) => {
-  // Ambil placeId dari route params
-  // Contoh: navigasi ke layar ini dengan navigation.navigate('PlaceDetail', { placeId: 1 });
+const PlaceDetailScreen = () => {
+  const route = useRoute();
+  const navigation = useNavigation();
   const { placeId } = route.params;
 
-  const [placeData, setPlaceData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [place, setPlace] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchPlaceDetail = async () => {
-      try {
-        setLoading(true);
+  // --- State Baru untuk Ulasan ---
+  const [userRating, setUserRating] = useState(0);
+  const [userComment, setUserComment] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // --- Fungsi untuk memuat data dipisahkan agar bisa dipanggil ulang ---
+  const fetchPlaceDetail = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/places/${placeId}`);
+      const json = await response.json();
+
+      if (response.ok) {
+        // Di backend, responsnya adalah { message: '...', place: {...} }
+        // jadi kita ambil datanya dari 'place'
+        setPlace(json.place);
         setError(null);
-
-        const response = await axios.get(`${API_BASE_URL}/places/${placeId}`);
-        setPlaceData(response.data);
-      } catch (err) {
-        console.error(
-          "Error fetching place details:",
-          err.response?.data || err.message
+      } else {
+        setError(
+          "Gagal memuat detail tempat: " +
+            (json.message || `Status ${response.status}`)
         );
-        setError("Failed to load place details. Please try again.");
-        Alert.alert(
-          "Error",
-          "Failed to load place details: " +
-            (err.response?.data?.message || err.message)
-        );
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err) {
+      console.error("Error fetching place detail:", err);
+      setError("Error jaringan saat memuat detail tempat.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchPlaceDetail();
-  }, [placeId]); // Dependency array: jalankan ulang useEffect jika placeId berubah
+  }, [placeId]);
 
-  if (loading) {
+  // --- Fungsi untuk mengirim ulasan (handleRatingPress diubah) ---
+  const handleSubmitReview = async () => {
+    if (userRating === 0) {
+      Alert.alert(
+        "Rating Kosong",
+        "Harap berikan rating bintang terlebih dahulu."
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // 1. Ambil token dari AsyncStorage
+      const token = await AsyncStorage.getItem("user_token");
+      if (!token) {
+        Alert.alert(
+          "Anda Belum Login",
+          "Silakan login untuk memberikan ulasan.",
+          [
+            { text: "OK", onPress: () => navigation.navigate("Login") }, // Arahkan ke layar login
+          ]
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Kirim data ke backend
+      const response = await fetch(`${API_BASE_URL}/reviews`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`, // Sertakan token
+        },
+        body: JSON.stringify({
+          place_id: placeId,
+          rating: userRating,
+          comment: userComment,
+        }),
+      });
+
+      const json = await response.json();
+
+      if (response.ok) {
+        Alert.alert("Ulasan Terkirim", "Terima kasih atas ulasan Anda!");
+        // Reset input & muat ulang data untuk menampilkan ulasan baru
+        setUserRating(0);
+        setUserComment("");
+        fetchPlaceDetail(); // Muat ulang detail tempat
+      } else {
+        // Tangani error dari backend
+        const errorMessage = json.message || "Gagal mengirim ulasan.";
+        Alert.alert("Gagal", errorMessage);
+      }
+    } catch (err) {
+      console.error("Error submitting review:", err);
+      Alert.alert("Error", "Terjadi masalah saat mengirim ulasan.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text>Loading details...</Text>
+        <ActivityIndicator size="large" color="#8A2BE2" />
+        <Text>Memuat detail tempat...</Text>
       </SafeAreaView>
     );
   }
@@ -70,394 +135,269 @@ const PlaceDetailScreen = ({ route, navigation }) => {
   if (error) {
     return (
       <SafeAreaView style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity onPress={() => fetchPlaceDetail()}>
-          <Text style={styles.retryButton}>Try Again</Text>
+        <Text style={styles.errorText}>Terjadi Kesalahan: {error}</Text>
+        <TouchableOpacity onPress={fetchPlaceDetail}>
+          <Text style={styles.retryButton}>Coba Lagi</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
-  if (!placeData) {
+  if (!place) {
     return (
       <SafeAreaView style={styles.errorContainer}>
-        <Text style={styles.errorText}>No place data available.</Text>
+        <Text style={styles.errorText}>Tempat tidak ditemukan.</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.retryButton}>Kembali</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
+  const renderStars = (rating, onStarPress = null) => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <TouchableOpacity
+          key={i}
+          onPress={() => onStarPress && onStarPress(i)}
+          disabled={!onStarPress}
+        >
+          <Ionicons
+            name={i <= rating ? "star" : "star-outline"}
+            size={onStarPress ? 30 : 18} // Bintang lebih besar untuk input
+            color={i <= rating ? "#FFD700" : "gray"}
+            style={styles.starIcon}
+          />
+        </TouchableOpacity>
+      );
+    }
+    return <View style={styles.starRatingContainer}>{stars}</View>;
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.safeArea}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={styles.backButton}
           >
-            <MaterialIcons name="arrow-back" size={24} color="black" />
+            <Ionicons name="arrow-back" size={24} color="black" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Detail Tempat</Text>
-          <View style={styles.placeholderRight} />
-        </View>
-
-        {/* Main Image */}
-        <View style={styles.imageContainer}>
-          <Image
-            source={{
-              uri:
-                placeData.formatted_main_image_url ||
-                "https://via.placeholder.com/400x200?text=No+Image",
-            }}
-            style={styles.mainImage}
-          />
-          <TouchableOpacity style={styles.heartIcon}>
-            <AntDesign name="hearto" size={24} color="white" />
+          <TouchableOpacity style={styles.heartButton}>
+            <Ionicons name="heart-outline" size={24} color="#ff3030" />
           </TouchableOpacity>
         </View>
 
-        {/* Place Info Section */}
-        <View style={styles.infoSection}>
-          <Text style={styles.placeName}>{placeData.name}</Text>
-          <View style={styles.ratingContainer}>
-            <AntDesign name="star" size={16} color="#FFD700" />
-            <Text style={styles.ratingText}>{placeData.average_rating}</Text>
-            <Text style={styles.reviewCount}>
-              ({placeData.reviews_count || 0} Ulasan)
-            </Text>
-          </View>
-          <View style={styles.locationContainer}>
-            <MaterialIcons name="location-on" size={16} color="gray" />
-            <Text style={styles.locationText}>{placeData.address}</Text>
-          </View>
-        </View>
+        <Image
+          source={{
+            uri: place.main_image_url || "https://via.placeholder.com/400x200",
+          }}
+          style={styles.placeImage}
+        />
 
-        {/* Description Section */}
-        {placeData.description && (
+        <View style={styles.contentContainer}>
+          <View style={styles.titleRatingContainer}>
+            <Text style={styles.placeName}>{place.name}</Text>
+            <View style={styles.ratingInfo}>
+              <Ionicons name="star" size={18} color="#FFD700" />
+              <Text style={styles.ratingText}>
+                {place.average_rating || "N/A"}
+              </Text>
+              <Text style={styles.reviewCount}>
+                ({place.review_count || 0} Ulasan)
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.addressContainer}>
+            <Ionicons name="location-outline" size={16} color="gray" />
+            <Text style={styles.addressText}>{place.address}</Text>
+          </View>
+
+          {/* ... Sisa info (Deskripsi, Jam Buka) sama seperti kode Anda ... */}
+
+          {/* --- Bagian Input Ulasan yang Diperbarui --- */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Deskripsi Tempat</Text>
-            <Text style={styles.descriptionText}>{placeData.description}</Text>
-          </View>
-        )}
-
-        {/* Details List */}
-        <View style={styles.section}>
-          {placeData.addedBy && (
-            <View style={styles.detailRow}>
-              <MaterialIcons name="person" size={20} color="gray" />
-              <Text style={styles.detailText}>
-                Dari {placeData.addedBy.username || placeData.addedBy.email}{" "}
-                (Anda)
+            <Text style={styles.sectionTitle}>Bagaimana Tempatnya?</Text>
+            <View style={styles.userRatingInput}>
+              {renderStars(userRating, setUserRating)}
+            </View>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Tulis komentar Anda di sini... (opsional)"
+              value={userComment}
+              onChangeText={setUserComment}
+              multiline
+            />
+            <TouchableOpacity
+              style={[
+                styles.submitButton,
+                isSubmitting && styles.submitButtonDisabled,
+              ]}
+              onPress={handleSubmitReview}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.submitButtonText}>
+                {isSubmitting ? "Mengirim..." : "Kirim Ulasan"}
               </Text>
-            </View>
-          )}
-          {placeData.opening_hours && (
-            <View style={styles.detailRow}>
-              <MaterialIcons name="access-time" size={20} color="gray" />
-              <Text style={styles.detailText}>
-                <Text style={{ color: "green", fontWeight: "bold" }}>Buka</Text>{" "}
-                · {placeData.opening_hours}
-              </Text>
-            </View>
-          )}
-          {/* Anda mungkin ingin menambahkan kolom harga di database atau menampilkannya secara statis */}
-          <View style={styles.detailRow}>
-            <FontAwesome5 name="money-bill-wave" size={18} color="gray" />
-            <Text style={styles.detailText}>Rp 10.000 - Rp 200.000</Text>{" "}
-            {/* Ganti dengan data dinamis jika ada */}
-          </View>
-        </View>
-
-        {/* Rating Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitleCentered}>Bagaimana Tempatnya?</Text>
-          <View style={styles.starRatingContainer}>
-            {[...Array(5)].map((_, i) => (
-              <AntDesign
-                key={i}
-                name={
-                  i < Math.floor(placeData.average_rating) ? "star" : "staro"
-                } // Isi bintang berdasarkan rating
-                size={30}
-                color={
-                  i < Math.floor(placeData.average_rating) ? "#FFD700" : "gray"
-                }
-                style={{ marginHorizontal: 5 }}
-              />
-            ))}
-          </View>
-        </View>
-
-        {/* Review Section */}
-        <View style={styles.section}>
-          <View style={styles.reviewHeader}>
-            <Text style={styles.reviewTitle}>Semua Ulasan</Text>
-            <View style={styles.ratingContainer}>
-              <AntDesign name="star" size={16} color="#FFD700" />
-              <Text style={styles.ratingText}>{placeData.average_rating}</Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
-          {placeData.reviews && placeData.reviews.length > 0 ? (
-            placeData.reviews.map((review) => (
-              <View key={review.id} style={styles.reviewItem}>
-                <View style={styles.reviewerInfo}>
-                  <Image
-                    source={{
-                      uri:
-                        review.user.profile_picture_url ||
-                        "https://via.placeholder.com/40",
-                    }}
-                    style={styles.profilePic}
-                  />
-                  <View>
-                    <Text style={styles.reviewerName}>
-                      {review.user.username || review.user.email}
+          {/* Bagian Semua Ulasan */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Semua Ulasan</Text>
+            <View style={styles.allReviewsContainer}>
+              {place.reviews && place.reviews.length > 0 ? (
+                place.reviews.map((review) => (
+                  <View key={review.id} style={styles.reviewCard}>
+                    <View style={styles.reviewHeader}>
+                      <Text style={styles.reviewerName}>
+                        {review.user ? review.user.username : "Pengguna"}
+                      </Text>
+                      {/* Memanggil renderStars tanpa fungsi press */}
+                      {renderStars(review.rating)}
+                    </View>
+                    <Text style={styles.reviewComment}>
+                      {review.comment || "Tidak ada komentar."}
                     </Text>
-                    <Text style={styles.reviewTime}>
-                      {new Date(review.created_at).toLocaleDateString()}
-                    </Text>{" "}
-                    {/* Format tanggal */}
+                    <Text style={styles.reviewDate}>
+                      {new Date(review.created_at).toLocaleDateString("id-ID")}
+                    </Text>
                   </View>
-                  <TouchableOpacity style={styles.optionsIcon}>
-                    <MaterialIcons name="more-vert" size={24} color="gray" />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.starRatingContainerSmall}>
-                  {[...Array(5)].map((_, i) => (
-                    <AntDesign
-                      key={i}
-                      name={i < review.rating ? "star" : "staro"}
-                      size={14}
-                      color={i < review.rating ? "#FFD700" : "gray"}
-                      style={{ marginHorizontal: 1 }}
-                    />
-                  ))}
-                </View>
-                <Text style={styles.reviewTextContent}>
-                  {review.comment || "No comment provided."}
+                ))
+              ) : (
+                <Text style={styles.noReviewsText}>
+                  Belum ada ulasan untuk tempat ini.
                 </Text>
-                <TouchableOpacity style={styles.likeContainer}>
-                  <AntDesign name="like2" size={18} color="gray" />
-                  <Text style={styles.likeText}>Like</Text>
-                </TouchableOpacity>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noReviewsText}>
-              Belum ada ulasan untuk tempat ini.
-            </Text>
-          )}
+              )}
+            </View>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
+// --- Tambahkan beberapa style baru ---
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#fff",
-  },
+  // ... (copy semua style lama Anda ke sini) ...
+  safeArea: { flex: 1, backgroundColor: "#f5f5f5" },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    padding: 20,
   },
   errorText: {
     color: "red",
     fontSize: 16,
+    textAlign: "center",
     marginBottom: 10,
   },
-  retryButton: {
-    color: "blue",
-    fontSize: 16,
-    textDecorationLine: "underline",
-  },
+  retryButton: { color: "#8A2BE2", fontSize: 16, fontWeight: "bold" },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 15,
-    paddingTop: 10,
-    paddingBottom: 5,
-    backgroundColor: "#fff",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#eee",
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    backgroundColor: "white",
   },
-  backButton: {
-    padding: 5,
+  backButton: { padding: 5 },
+  headerTitle: { fontSize: 18, fontWeight: "bold" },
+  heartButton: { padding: 5 },
+  placeImage: { width: "100%", height: 250, resizeMode: "cover" },
+  contentContainer: {
+    padding: 16,
+    backgroundColor: "white",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginTop: -20,
+    paddingBottom: 50,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  placeholderRight: {
-    width: 24, // Same width as backButton for centering
-  },
-  imageContainer: {
-    width: "100%",
-    height: 200,
-    position: "relative",
-  },
-  mainImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  heartIcon: {
-    position: "absolute",
-    top: 15,
-    right: 15,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    borderRadius: 20,
-    padding: 5,
-  },
-  infoSection: {
-    padding: 15,
-    backgroundColor: "#fff",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#eee",
-  },
-  placeName: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  ratingContainer: {
+  titleRatingContainer: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 5,
-  },
-  ratingText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginLeft: 5,
-    marginRight: 5,
-  },
-  reviewCount: {
-    fontSize: 14,
-    color: "gray",
-  },
-  locationContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  locationText: {
-    fontSize: 14,
-    color: "gray",
-    marginLeft: 5,
-  },
-  section: {
-    padding: 15,
-    backgroundColor: "#fff",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#eee",
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
     marginBottom: 10,
   },
-  sectionTitleCentered: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  descriptionText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#333",
-  },
-  detailRow: {
+  placeName: { fontSize: 24, fontWeight: "bold", flex: 1, marginRight: 10 },
+  ratingInfo: { flexDirection: "row", alignItems: "center" },
+  ratingText: { fontSize: 18, fontWeight: "bold", marginLeft: 5 },
+  reviewCount: { fontSize: 14, color: "gray", marginLeft: 5 },
+  addressContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 15,
   },
-  detailText: {
-    fontSize: 14,
-    marginLeft: 10,
-    color: "#333",
-  },
-  starRatingContainer: {
+  addressText: { fontSize: 16, color: "gray", marginLeft: 5 },
+  section: { marginTop: 20, marginBottom: 10 },
+  sectionTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
+  descriptionText: { fontSize: 16, lineHeight: 24, color: "#333" },
+  infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
+  infoIcon: { marginRight: 10 },
+  infoText: { fontSize: 16, color: "#555" },
+  starRatingContainer: { flexDirection: "row" },
+  starIcon: { marginHorizontal: 2 },
+  userRatingInput: {
     flexDirection: "row",
     justifyContent: "center",
-    marginVertical: 10,
+    paddingVertical: 10,
   },
-  starRatingContainerSmall: {
-    flexDirection: "row",
-    alignSelf: "flex-start", // Agar bintang-bintang tidak menyebar penuh
-    marginBottom: 5,
+  commentInput: {
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 15,
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  submitButton: {
+    backgroundColor: "#8A2BE2",
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 15,
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#c7a1e6",
+  },
+  submitButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  allReviewsContainer: { marginTop: 10 },
+  reviewCard: {
+    backgroundColor: "#f9f9f9",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
   },
   reviewHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
-  },
-  reviewTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  reviewItem: {
-    paddingVertical: 15,
-    borderTopWidth: 0.5,
-    borderTopColor: "#eee",
-  },
-  reviewerInfo: {
-    flexDirection: "row",
-    alignItems: "center",
     marginBottom: 8,
-    position: "relative",
   },
-  profilePic: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
-    backgroundColor: "#ccc",
-  },
-  reviewerName: {
-    fontWeight: "bold",
-    fontSize: 15,
-  },
-  reviewTime: {
-    fontSize: 12,
-    color: "gray",
-  },
-  optionsIcon: {
-    position: "absolute",
-    right: 0,
-    top: 0,
-  },
-  reviewTextContent: {
+  reviewerName: { fontWeight: "bold", fontSize: 15 },
+  reviewComment: {
     fontSize: 14,
-    lineHeight: 20,
     color: "#333",
-    marginBottom: 10,
+    marginBottom: 8,
+    lineHeight: 20,
   },
-  likeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  likeText: {
-    marginLeft: 5,
-    color: "gray",
-  },
-  noReviewsText: {
-    textAlign: "center",
-    marginTop: 20,
-    color: "gray",
-  },
+  reviewDate: { fontSize: 12, color: "gray", textAlign: "right" },
+  noReviewsText: { textAlign: "center", color: "gray", marginTop: 20 },
 });
 
 export default PlaceDetailScreen;

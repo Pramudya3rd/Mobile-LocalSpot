@@ -1,4 +1,3 @@
-// src/screens/RegisterScreen.js
 import React, { useState } from "react";
 import {
   StyleSheet,
@@ -10,7 +9,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons"; // Pastikan Ionicons sudah terinstal
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useNavigation } from "@react-navigation/native";
@@ -23,6 +22,11 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [password_confirmation, setPasswordConfirmation] = useState("");
+  // --- State baru untuk visibilitas password ---
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] =
+    useState(false);
+  // --- Akhir state baru ---
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -61,8 +65,10 @@ export default function RegisterScreen() {
 
     try {
       const BACKEND_REGISTER_URL = "http://10.0.2.2:8000/api/register";
+      const BACKEND_PRODUCTION_REGISTER_URL =
+        "https://localspot.hafidzirham.com/api/register"; // Ganti dengan
 
-      const response = await fetch(BACKEND_REGISTER_URL, {
+      const response = await fetch(BACKEND_PRODUCTION_REGISTER_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -132,6 +138,16 @@ export default function RegisterScreen() {
     navigation.replace("Login");
   };
 
+  // --- Fungsi untuk toggle visibilitas password ---
+  const togglePasswordVisibility = () => {
+    setIsPasswordVisible(!isPasswordVisible);
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    setIsConfirmPasswordVisible(!isConfirmPasswordVisible);
+  };
+  // --- Akhir fungsi toggle ---
+
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
@@ -163,24 +179,54 @@ export default function RegisterScreen() {
           autoCapitalize="none"
           autoCorrect={false}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          secureTextEntry={true}
-          value={password}
-          onChangeText={setPassword}
-          placeholderTextColor="#999"
-          autoCapitalize="none"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Confirm password"
-          secureTextEntry={true}
-          value={password_confirmation}
-          onChangeText={setPasswordConfirmation}
-          placeholderTextColor="#999"
-          autoCapitalize="none"
-        />
+
+        {/* --- Password Input dengan Eye Icon --- */}
+        <View style={styles.passwordInputWrapper}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Password"
+            secureTextEntry={!isPasswordVisible} // Atur berdasarkan state
+            value={password}
+            onChangeText={setPassword}
+            placeholderTextColor="#999"
+            autoCapitalize="none"
+          />
+          <TouchableOpacity
+            style={styles.eyeIcon}
+            onPress={togglePasswordVisibility}
+          >
+            <Ionicons
+              name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
+              size={22}
+              color="#999"
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* --- Confirm Password Input dengan Eye Icon --- */}
+        <View style={styles.passwordInputWrapper}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Confirm password"
+            secureTextEntry={!isConfirmPasswordVisible} // Atur berdasarkan state
+            value={password_confirmation}
+            onChangeText={setPasswordConfirmation}
+            placeholderTextColor="#999"
+            autoCapitalize="none"
+          />
+          <TouchableOpacity
+            style={styles.eyeIcon}
+            onPress={toggleConfirmPasswordVisibility}
+          >
+            <Ionicons
+              name={
+                isConfirmPasswordVisible ? "eye-off-outline" : "eye-outline"
+              }
+              size={22}
+              color="#999"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {error && <Text style={styles.errorMessage}>{error}</Text>}
@@ -241,10 +287,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 15,
-    marginBottom: 15,
+    marginBottom: 15, // Jarak antar input biasa
     fontSize: 16,
     color: "#333",
   },
+  // --- Gaya baru untuk password input ---
+  passwordInputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderColor: "#ddd",
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 15, // Jarak antar password input
+  },
+  passwordInput: {
+    flex: 1,
+    height: 50,
+    paddingHorizontal: 15,
+    fontSize: 16,
+    color: "#333",
+  },
+  eyeIcon: {
+    paddingHorizontal: 15, // Padding agar ikon tidak terlalu mepet
+  },
+  // --- Akhir gaya baru ---
   errorMessage: {
     color: "red",
     fontSize: 14,
